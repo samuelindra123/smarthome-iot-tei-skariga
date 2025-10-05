@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Roadmap / Graph Utilities */
+.animate-pulse-slow {
+  animation: pulse-slow 2.4s ease-in-out infinite;
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .45; }
+}
+
+.dotted-bg {
+  background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.08) 1px, transparent 0);
+  background-size: 22px 22px;
+}
+
+.graph-canvas {
+  cursor: grab;
+  transition: background-color .3s ease;
+}
+.graph-canvas:active {
+  cursor: grabbing;
+}
+
+.no-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+
+.zoom-fade-edge {
+  mask-image: radial-gradient(circle at center, black 60%, transparent 100%);
+  -webkit-mask-image: radial-gradient(circle at center, black 60%, transparent 100%);
+}
+
+/* Print mode helpers */
+@media print {
+  .hide-print { display: none !important; }
+  .print-bg-white { background: #ffffff !important; color: #000 !important; }
+  .print-border { border-color: #000 !important; }
+  body { background: #ffffff !important; }
+}
+
+/* Tooltip base (positioned absolutely in React) */
+.tooltip-shadow { box-shadow: 0 4px 18px -2px rgba(0,0,0,0.55); }
+
