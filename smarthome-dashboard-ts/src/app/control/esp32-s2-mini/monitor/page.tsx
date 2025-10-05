@@ -4,9 +4,8 @@ import Link from 'next/link';
 import mqtt, { MqttClient } from 'mqtt';
 
 // CONFIG (sender / broker marker)
-const BROKER_HOST = process.env.NEXT_PUBLIC_MQTT_HOST || '16.79.99.183';
-const BROKER_PORT = process.env.NEXT_PUBLIC_MQTT_PORT || '9001'; // websocket port (adjust if different)
-const BROKER_URL = `ws://${BROKER_HOST}:${BROKER_PORT}`;
+// Fixed production broker WSS endpoint (override previous env-based host/port)
+const BROKER_URL = 'wss://mqtt.tecnoverse.app:8081';
 const SENDER_CLIENT_ID = 'WEB_MONITOR_DASH'; // penanda pengirim / client id web
 const DEVICE_CLIENT_ID = 'ESP32_S2_MINI_01'; // harus cocok dengan firmware
 const PRESENCE_TIMEOUT_MS = 30_000; // auto offline setelah 30s tanpa pesan
@@ -162,7 +161,7 @@ export default function MonitorPage() {
   const exportSnapshot = () => {
     const blob = new Blob([JSON.stringify({
       generatedAt: new Date().toISOString(),
-      broker: BROKER_HOST,
+      broker: BROKER_URL,
       deviceClientId: DEVICE_CLIENT_ID,
       presence,
       summary,
@@ -183,8 +182,7 @@ export default function MonitorPage() {
             <h1 className="text-3xl font-bold tracking-tight">ESP32 Presence & Status Monitor</h1>
             <p className="text-gray-400 text-sm">Memantau konektivitas dan status ON/OFF perangkat melalui topik MQTT retained dan pesan real-time.</p>
             <div className="flex flex-wrap gap-2 text-[11px] text-gray-300">
-              <span className="px-2 py-1 bg-gray-800/60 rounded border border-gray-700">Broker: {BROKER_HOST}</span>
-              <span className="px-2 py-1 bg-gray-800/60 rounded border border-gray-700">WS Port: {BROKER_PORT}</span>
+              <span className="px-2 py-1 bg-gray-800/60 rounded border border-gray-700">Broker URL: {BROKER_URL}</span>
               <span className="px-2 py-1 bg-gray-800/60 rounded border border-gray-700">Web Client ID: {SENDER_CLIENT_ID}</span>
               <span className="px-2 py-1 bg-gray-800/60 rounded border border-gray-700">Device Client ID: {DEVICE_CLIENT_ID}</span>
             </div>

@@ -22,18 +22,8 @@ interface MetricSample { t: number; messages?: number; bytesTotal?: number; }
 
 // (Removed unused SYS_TOPICS constant to satisfy ESLint)
 
-const getMqttUrl = () => {
-  const full = process.env.NEXT_PUBLIC_MQTT_URL;
-  if (full) return full;
-  const host = process.env.NEXT_PUBLIC_MQTT_HOST || '16.79.99.183';
-  const wsPort = process.env.NEXT_PUBLIC_MQTT_WS_PORT || '9001';
-  const isBrowser = typeof window !== 'undefined';
-  const secureContext = isBrowser && window.location.protocol === 'https:';
-  const protocol = secureContext ? 'wss' : 'ws';
-  return `${protocol}://${host}:${wsPort}`;
-};
-
-const MQTT_URL = getMqttUrl();
+// Fixed production MQTT broker URL (secured WSS)
+const MQTT_URL = 'wss://mqtt.tecnoverse.app:8081';
 
 export default function BrokerMetricsPage() {
   const [client, setClient] = useState<MqttClient | null>(null);

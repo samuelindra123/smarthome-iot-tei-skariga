@@ -7,18 +7,9 @@ import Link from 'next/link';
 
 interface Device { id: string; name: string; }
 
-const getMqttUrl = () => {
-  const full = process.env.NEXT_PUBLIC_MQTT_URL;
-  if (full) return full;
-  const host = process.env.NEXT_PUBLIC_MQTT_HOST || '16.79.99.183';
-  const wsPort = process.env.NEXT_PUBLIC_MQTT_WS_PORT || '9001';
-  const isBrowser = typeof window !== 'undefined';
-  const secureContext = isBrowser && window.location.protocol === 'https:';
-  const protocol = secureContext ? 'wss' : 'ws';
-  return `${protocol}://${host}:${wsPort}`;
-};
-
-const MQTT_BROKER_URL: string = getMqttUrl();
+// FIXED DEPLOY BROKER (overrides previous dynamic env-based discovery)
+// If you need to revert to dynamic behaviour, restore previous getMqttUrl logic.
+const MQTT_BROKER_URL: string = 'wss://mqtt.tecnoverse.app:8081';
 
 const devices: Device[] = [
   { id: 'lampu1', name: 'Lampu Ruang Tamu' },
