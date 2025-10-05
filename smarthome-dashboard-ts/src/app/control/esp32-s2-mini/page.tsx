@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import mqtt, { MqttClient } from 'mqtt';
-import DeviceCard, { DeviceStatus, Command } from '@/components/DeviceCard';
+import { DeviceStatus, Command } from '@/components/DeviceCard';
 import Link from 'next/link';
 
 interface Device { id: string; name: string; }

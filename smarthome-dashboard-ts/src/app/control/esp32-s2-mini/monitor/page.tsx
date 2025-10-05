@@ -223,7 +223,7 @@ export default function MonitorPage() {
               ))}
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <div className="text-[10px] text-gray-500">Nilai 'UNKNOWN' berarti belum ada retained / pesan diterima.</div>
+              <div className="text-[10px] text-gray-500">Nilai &apos;UNKNOWN&apos; berarti belum ada retained / pesan diterima.</div>
               <button onClick={sendPing} disabled={pinging} className="text-[10px] px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 border border-gray-700 disabled:opacity-50">Ping Device</button>
               <button onClick={exportSnapshot} className="text-[10px] px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 border border-gray-700">Export Snapshot</button>
               <span className="text-[10px] text-gray-400">Ping: {pingResult}</span>

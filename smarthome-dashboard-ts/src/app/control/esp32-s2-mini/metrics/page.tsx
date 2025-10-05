@@ -20,15 +20,7 @@ function Sparkline({ data, stroke, label }: { data: number[]; stroke: string; la
 interface LogEntry { ts: number; topic: string; payload: string; type: 'sys' | 'app'; }
 interface MetricSample { t: number; messages?: number; bytesTotal?: number; }
 
-const SYS_TOPICS = [
-  '$SYS/broker/clients/connected',
-  '$SYS/broker/clients/disconnected',
-  '$SYS/broker/messages/received',
-  '$SYS/broker/messages/sent',
-  '$SYS/broker/bytes/received',
-  '$SYS/broker/bytes/sent',
-  '$SYS/broker/uptime',
-];
+// (Removed unused SYS_TOPICS constant to satisfy ESLint)
 
 const getMqttUrl = () => {
   const full = process.env.NEXT_PUBLIC_MQTT_URL;
@@ -221,11 +213,11 @@ export default function BrokerMetricsPage() {
       });
       ctx.strokeStyle = s.color; ctx.lineWidth = 1.5; ctx.stroke();
       // area fill
-      const lastX = pad + ((s.data.length-1)/(len-1))* (w/(window.devicePixelRatio||1)-pad*2);
-      const lastY = (h/(window.devicePixelRatio||1)-pad) - (s.data[s.data.length-1]/max)*(h/(window.devicePixelRatio||1)-pad*2);
-      ctx.lineTo(lastX, h/(window.devicePixelRatio||1)-pad);
-      ctx.lineTo(pad, h/(window.devicePixelRatio||1)-pad);
-      ctx.closePath();
+  // lastX/lastY no longer needed directly; removed to clear unused warning
+  // Close area path back to baseline
+  ctx.lineTo(pad + ((s.data.length-1)/(len-1))* (w/(window.devicePixelRatio||1)-pad*2), h/(window.devicePixelRatio||1)-pad);
+  ctx.lineTo(pad, h/(window.devicePixelRatio||1)-pad);
+  ctx.closePath();
       const g = ctx.createLinearGradient(0,pad,0,h/(window.devicePixelRatio||1)-pad);
       g.addColorStop(0, s.color+'55');
       g.addColorStop(1, s.color+'00');
@@ -233,7 +225,8 @@ export default function BrokerMetricsPage() {
     });
   };
 
-  useEffect(()=>{ drawBigChart(); }, [sampleMessagesReceived, sampleClientsConnected, sampleBytesPerSec]);
+  // Redraw chart when samples change
+  useEffect(()=>{ drawBigChart(); }, [sampleMessagesReceived, sampleClientsConnected, sampleBytesPerSec, drawBigChart]);
 
   const brokerAgeSec = lastHeartbeat ? Math.round((Date.now() - lastHeartbeat) / 1000) : null;
   const brokerAlive = status === 'online' && brokerAgeSec !== null && brokerAgeSec < 10; // heartbeat within last 10s
