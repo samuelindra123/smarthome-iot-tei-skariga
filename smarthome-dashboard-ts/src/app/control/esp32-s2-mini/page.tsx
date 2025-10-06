@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { PRESENCE_TOPIC, PresenceModel, presenceFromPayload, evaluateTimeout } from '@/lib/presence';
 import mqtt, { MqttClient } from 'mqtt';
 import { DeviceStatus, Command } from '@/components/DeviceCard';
 import Link from 'next/link';
@@ -28,6 +29,16 @@ export default function ControlEsp32S2MiniPage() {
   const [reconnecting, setReconnecting] = useState(false);
   // Per-device temporary warning messages after blocked commands
   const [commandWarnings, setCommandWarnings] = useState<Record<string, { msg:string; ts:number }>>({});
+  // Presence model (device-level, not broker connection)
+  const [presence, setPresence] = useState<PresenceModel>({ state: 'unknown', lastSeen: null, lastPayload: null, source: undefined });
+
+  // Periodic timeout evaluation for presence
+  useEffect(() => {
+    const id = setInterval(() => {
+      setPresence(p => evaluateTimeout(p));
+    }, 3000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     let isCancelled = false;
@@ -43,7 +54,7 @@ export default function ControlEsp32S2MiniPage() {
       console.log('Terhubung ke MQTT Broker:', MQTT_BROKER_URL);
       setConnected(true);
       setReconnecting(false);
-      mqttClient.subscribe('smarthome/+/status', (err) => {
+      mqttClient.subscribe(['smarthome/+/status', PRESENCE_TOPIC], (err) => {
         if (err) console.error('Gagal subscribe:', err);
       });
     });
@@ -52,20 +63,37 @@ export default function ControlEsp32S2MiniPage() {
     mqttClient.on('close', () => { if (!isCancelled) { console.log('Koneksi MQTT tertutup.'); setConnected(false);} });
     mqttClient.on('error', (err) => { if (!isCancelled) { console.error('MQTT Error:', err.message); setConnected(false);} });
 
-    mqttClient.on('message', (topic: string, message: Buffer) => {
+    mqttClient.on('message', (topic: string, message: Buffer, packet) => {
       if (isCancelled) return;
       const deviceId = topic.split('/')[1];
       const newStatus = message.toString() as DeviceStatus;
-      setDeviceStatuses(prev => ({ ...prev, [deviceId]: newStatus }));
-      setHistory(h => {
-        // only append if related to known device and last entry not duplicate status
-        if (!devices.find(d=>d.id===deviceId)) return h;
-        const last = h[h.length-1];
-        if (last && last.id===deviceId && last.statusAfter===newStatus) return h;
-        return [...h, { ts: Date.now(), id: deviceId, action: newStatus as Command, statusAfter: newStatus }].slice(-80);
-      });
-      setAnimating(a=>({ ...a, [deviceId]: true }));
-      setTimeout(()=> setAnimating(a=> ({ ...a, [deviceId]: false })), 600);
+      if (topic.startsWith('smarthome/') && topic.endsWith('/status')) {
+        setDeviceStatuses(prev => ({ ...prev, [deviceId]: newStatus }));
+        setHistory(h => {
+          if (!devices.find(d=>d.id===deviceId)) return h;
+          const last = h[h.length-1];
+          if (last && last.id===deviceId && last.statusAfter===newStatus) return h;
+          return [...h, { ts: Date.now(), id: deviceId, action: newStatus as Command, statusAfter: newStatus }].slice(-80);
+        });
+        setAnimating(a=>({ ...a, [deviceId]: true }));
+        setTimeout(()=> setAnimating(a=> ({ ...a, [deviceId]: false })), 600);
+        // Treat status message as heartbeat (refresh presence if already online/unknown)
+        setPresence(p => {
+          if (p.state === 'offline') return p; // don't auto-resurrect without explicit presence
+          return { ...p, state: p.state === 'unknown' ? 'online' : p.state, lastSeen: Date.now(), source: 'status' };
+        });
+      } else if (topic === PRESENCE_TOPIC) {
+        const payload = message.toString();
+        const meta = presenceFromPayload(payload);
+        setPresence(p => ({
+          ...p,
+            state: meta.state,
+            lastSeen: meta.state === 'online' ? Date.now() : p.lastSeen,
+            lastPayload: payload,
+            source: meta.source,
+            reason: meta.state === 'offline' ? 'LWT/offline signal' : undefined
+        }));
+      }
     });
 
     return () => {
@@ -115,13 +143,17 @@ export default function ControlEsp32S2MiniPage() {
           <div className="flex-1 space-y-4">
             <div className="flex items-center gap-3">
               <h1 className="text-4xl md:text-5xl font-bold tracking-tight">ESP32 Relay Control</h1>
-              {connectionState==='disconnected' && <span className="px-2 py-1 rounded bg-red-500/20 text-red-300 text-[10px] border border-red-600/40 animate-pulse">Offline</span>}
+              {connectionState==='disconnected' && <span className="px-2 py-1 rounded bg-red-500/20 text-red-300 text-[10px] border border-red-600/40 animate-pulse">Broker Offline</span>}
+              {presence.state==='offline' && <span className="px-2 py-1 rounded bg-red-600/30 text-red-200 text-[10px] border border-red-500/50 animate-pulse">Device Offline{presence.source==='timeout' ? ' (Timeout)' : ''}</span>}
+              {presence.state==='unknown' && connectionState!=='disconnected' && <span className="px-2 py-1 rounded bg-gray-600/30 text-gray-200 text-[10px] border border-gray-500/50 animate-pulse">Presence Unknown</span>}
               {connectionState==='connecting' && <span className="px-2 py-1 rounded bg-yellow-500/20 text-yellow-300 text-[10px] border border-yellow-600/40 animate-pulse">Syncing...</span>}
               {connectionState==='ready' && <span className="px-2 py-1 rounded bg-green-500/20 text-green-300 text-[10px] border border-green-600/40">Live</span>}
             </div>
             <p className="text-sm md:text-base text-gray-400 max-w-2xl leading-relaxed">Pengendalian realtime 4 kanal relay (2 lampu & 2 stopkontak) melalui MQTT WebSocket. Panel kiri untuk aksi, panel kanan mensimulasikan keadaan perangkat seperti lingkungan mini Wokwi.</p>
             <div className="flex flex-wrap gap-3 text-[11px] text-gray-300">
               <span className="px-2 py-1 rounded bg-gray-800/60 border border-gray-700">Broker: {MQTT_BROKER_URL.replace(/^wss?:\/\//,'')}</span>
+              <span className="px-2 py-1 rounded bg-gray-800/60 border border-gray-700">Presence: {presence.state.toUpperCase()}</span>
+              {presence.reason && <span className="px-2 py-1 rounded bg-red-800/40 border border-red-700 text-red-300">{presence.reason}</span>}
               <span className="px-2 py-1 rounded bg-gray-800/60 border border-gray-700">Devices: {devices.length}</span>
             </div>
           </div>
@@ -168,8 +200,8 @@ export default function ControlEsp32S2MiniPage() {
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                      <button onClick={()=>handleControl(device.id,'ON')} disabled={!client || !client.connected} className="px-3 py-2 rounded-md text-sm font-semibold bg-green-600/80 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed shadow shadow-green-600/30">ON</button>
-                      <button onClick={()=>handleControl(device.id,'OFF')} disabled={!client || !client.connected} className="px-3 py-2 rounded-md text-sm font-semibold bg-red-600/80 hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed shadow shadow-red-600/30">OFF</button>
+                      <button onClick={()=>handleControl(device.id,'ON')} disabled={!client || !client.connected || presence.state!=='online'} className="px-3 py-2 rounded-md text-sm font-semibold bg-green-600/80 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed shadow shadow-green-600/30">ON</button>
+                      <button onClick={()=>handleControl(device.id,'OFF')} disabled={!client || !client.connected || presence.state!=='online'} className="px-3 py-2 rounded-md text-sm font-semibold bg-red-600/80 hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed shadow shadow-red-600/30">OFF</button>
                     </div>
                     <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition pointer-events-none bg-gradient-to-br from-yellow-500/5 via-transparent to-transparent" />
                   </div>

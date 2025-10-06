@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import mqtt, { MqttClient } from 'mqtt';
+import { PRESENCE_TOPIC as SHARED_PRESENCE_TOPIC, presenceFromPayload, evaluateTimeout, PresenceModel } from '@/lib/presence';
 
 // CONFIG (sender / broker marker)
 // Fixed production broker WSS endpoint (override previous env-based host/port)
@@ -18,7 +19,7 @@ const STATUS_TOPICS = [
   'smarthome/stopkontak2/status'
 ];
 // Tambah constant presence topic (sinkron dengan firmware)
-const PRESENCE_TOPIC = 'smarthome/device/esp32s2mini/presence';
+const PRESENCE_TOPIC = SHARED_PRESENCE_TOPIC; // unify with shared util
 
 interface DeviceStatusRec {
   topic: string;
@@ -37,7 +38,8 @@ export default function MonitorPage() {
   const clientRef = useRef<MqttClient | null>(null);
   const [connecting, setConnecting] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [presence, setPresence] = useState<PresenceState>({ connected: false, lastSeen: null, lastDeltaSec: 0 });
+  const [presenceState, setPresenceState] = useState<PresenceModel>({ state: 'unknown', lastSeen: null });
+  const [presence, setPresence] = useState<PresenceState>({ connected: false, lastSeen: null, lastDeltaSec: 0 }); // legacy local usage for existing UI fields
   const [statuses, setStatuses] = useState<Record<string, DeviceStatusRec>>(() => {
     const base: Record<string, DeviceStatusRec> = {};
     STATUS_TOPICS.forEach(t => { base[t] = { topic: t, lastPayload: null, lastUpdated: null }; });
@@ -58,15 +60,12 @@ export default function MonitorPage() {
   // Age timer + auto offline
   useEffect(() => {
     const id = setInterval(() => {
+      setPresenceState(p => evaluateTimeout(p));
       setPresence(p => {
         if (!p.lastSeen) return { ...p, lastDeltaSec: 0 };
         const deltaMs = Date.now() - p.lastSeen;
         const offline = deltaMs > PRESENCE_TIMEOUT_MS;
-        return {
-          connected: offline ? false : p.connected,
-          lastSeen: p.lastSeen,
-          lastDeltaSec: Math.floor(deltaMs/1000)
-        };
+        return { connected: offline ? false : p.connected, lastSeen: p.lastSeen, lastDeltaSec: Math.floor(deltaMs/1000) };
       });
     }, 1000);
     return () => clearInterval(id);
@@ -102,17 +101,25 @@ export default function MonitorPage() {
             next[topic] = { topic, lastPayload: payload, lastUpdated: now, retained };
           return next;
         });
+        // Treat status as heartbeat refresh (do not revive if explicit offline from LWT)
         setPresence(p => ({ connected: true, lastSeen: now, lastDeltaSec: 0 }));
+        setPresenceState(ps => ps.state === 'offline' ? ps : { ...ps, state: ps.state === 'unknown' ? 'online' : ps.state, lastSeen: now, source: 'status' });
       }
 
       // presence payload
       if (topic === PRESENCE_TOPIC) {
         setPresencePayload(payload);
-        if (payload == 'online') {
-          setPresence(p => ({ ...p, connected: true, lastSeen: Date.now(), lastDeltaSec: 0 }));
-        } else if (payload == 'offline') {
-          setPresence(p => ({ ...p, connected: false }));
-        }
+        const meta = presenceFromPayload(payload);
+        setPresenceState(ps => ({
+          ...ps,
+          state: meta.state,
+          lastSeen: meta.state === 'online' ? Date.now() : ps.lastSeen,
+          source: meta.source,
+          lastPayload: payload,
+          reason: meta.state === 'offline' ? 'LWT/offline signal' : undefined
+        }));
+        if (meta.state === 'online') setPresence(p => ({ connected: true, lastSeen: Date.now(), lastDeltaSec: 0 }));
+        if (meta.state === 'offline') setPresence(p => ({ ...p, connected: false }));
       }
 
       setMessages(m => {
@@ -200,10 +207,12 @@ export default function MonitorPage() {
             <h2 className="font-semibold text-sm tracking-tight">Konektivitas Perangkat</h2>
             <div className="text-xs text-gray-300 space-y-1">
               <p>Status Dashboard → Broker: {connecting ? <span className="text-yellow-400">Connecting...</span> : <span className="text-green-400">Connected</span>}</p>
-              <p>Presence ESP32: {presence.connected ? <span className="text-green-400">Muncul</span> : <span className="text-red-400">Tidak Terdeteksi</span>}</p>
+              <p>Presence ESP32: {presenceState.state === 'online' ? <span className="text-green-400">Online</span> : presenceState.state === 'offline' ? <span className="text-red-400">Offline</span> : <span className="text-gray-400">Unknown</span>}</p>
               <p>Presence Payload: {presencePayload ? <span className={presencePayload === 'online' ? 'text-green-400' : 'text-red-400'}>{presencePayload}</span> : <span className="text-gray-500">—</span>}</p>
               <p>Last Seen: {presence.lastSeen ? new Date(presence.lastSeen).toLocaleTimeString() : '—'}</p>
               <p>Age: {presence.lastSeen ? presence.lastDeltaSec + 's' : '—'}</p>
+              <p>Presence Source: {presenceState.source || '—'}</p>
+              {presenceState.reason && <p className="text-red-400">Reason: {presenceState.reason}</p>}
               <p>Total Pesan (session): {seq}</p>
             </div>
             <div className="mt-auto text-[10px] text-gray-500">Presence ditentukan dari retained / publish terbaru salah satu topik status. Auto-offline jika &gt; {PRESENCE_TIMEOUT_MS/1000}s tanpa pesan.</div>
