@@ -14,6 +14,7 @@ export default function Header() {
           <Link href="/roadmap" className="hover:text-yellow-400 transition-colors">Roadmap</Link>
           <Link href="/docs" className="hover:text-yellow-400 transition-colors">Docs</Link>
           <Link href="/sourcecode" className="hover:text-yellow-400 transition-colors">Source</Link>
+          <Link href="/dokumentasi" className="hover:text-yellow-400 transition-colors">PDF</Link>
         </nav>
       </div>
     </header>
