@@ -127,7 +127,8 @@ export default function RoadmapPage() {
     const handler = (e: WheelEvent) => onWheel(e);
     el.addEventListener('wheel', handler, { passive: false });
     return () => { el.removeEventListener('wheel', handler); };
-  }, [onWheel]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const resetView = () => { setScale(1); setTx(0); setTy(0); };
   const zoomIn = () => setScale(s => clampScale(s + 0.18));

@@ -37,7 +37,8 @@ interface PresenceState {
 export default function MonitorPage() {
   const clientRef = useRef<MqttClient | null>(null);
   const [connecting, setConnecting] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Removed error state (unused) to satisfy ESLint
+  const [, setError] = useState<string | null>(null);
   const [presenceState, setPresenceState] = useState<PresenceModel>({ state: 'unknown', lastSeen: null });
   const [presence, setPresence] = useState<PresenceState>({ connected: false, lastSeen: null, lastDeltaSec: 0 }); // legacy local usage for existing UI fields
   const [statuses, setStatuses] = useState<Record<string, DeviceStatusRec>>(() => {

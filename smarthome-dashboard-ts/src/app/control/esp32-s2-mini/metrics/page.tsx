@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import mqtt, { MqttClient } from 'mqtt';
 import Link from 'next/link';
 
@@ -177,8 +177,8 @@ export default function BrokerMetricsPage() {
   };
 
   const clearLogs = () => { setLogs([]); try { sessionStorage.removeItem('mqttLogs'); } catch {} };
-  // Big area chart drawing (messages, clients, bytes/sec)
-  const drawBigChart = () => {
+  // Big area chart drawing (messages, clients, bytes/sec) wrapped in useCallback
+  const drawBigChart = useCallback(() => {
     const canvas = canvasRef.current; if (!canvas) return;
     const ctx = canvas.getContext('2d'); if (!ctx) return;
     const w = canvas.width = canvas.clientWidth * (window.devicePixelRatio || 1);
@@ -213,10 +213,10 @@ export default function BrokerMetricsPage() {
       g.addColorStop(1, s.color+'00');
       ctx.fillStyle = g; ctx.fill();
     });
-  };
+  }, [sampleMessagesReceived, sampleClientsConnected, sampleBytesPerSec]);
 
   // Redraw chart when samples change
-  useEffect(()=>{ drawBigChart(); }, [sampleMessagesReceived, sampleClientsConnected, sampleBytesPerSec, drawBigChart]);
+  useEffect(()=>{ drawBigChart(); }, [drawBigChart]);
 
   const brokerAgeSec = lastHeartbeat ? Math.round((Date.now() - lastHeartbeat) / 1000) : null;
   const brokerAlive = status === 'online' && brokerAgeSec !== null && brokerAgeSec < 10; // heartbeat within last 10s

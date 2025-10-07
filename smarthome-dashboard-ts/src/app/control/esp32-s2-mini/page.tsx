@@ -63,7 +63,7 @@ export default function ControlEsp32S2MiniPage() {
     mqttClient.on('close', () => { if (!isCancelled) { console.log('Koneksi MQTT tertutup.'); setConnected(false);} });
     mqttClient.on('error', (err) => { if (!isCancelled) { console.error('MQTT Error:', err.message); setConnected(false);} });
 
-    mqttClient.on('message', (topic: string, message: Buffer, packet) => {
+  mqttClient.on('message', (topic: string, message: Buffer) => {
       if (isCancelled) return;
       const deviceId = topic.split('/')[1];
       const newStatus = message.toString() as DeviceStatus;
