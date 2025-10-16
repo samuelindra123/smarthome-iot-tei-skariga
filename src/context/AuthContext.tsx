@@ -89,15 +89,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
         } catch (error) {
             if (error instanceof AppwriteException) {
+                const appwriteError = error as AppwriteException & { type?: string; response?: unknown };
                 console.error('[auth] Appwrite error saat login:', {
                     code: error.code,
                     message: error.message,
-                    type: (error as any).type,
-                    response: (error as any).response,
+                    type: appwriteError.type,
+                    response: appwriteError.response,
                 });
 
                 // Jika Appwrite menolak karena sesi sudah ada, ambil detail session dan redirect
-                const errType = (error as any).type;
+                const errType = appwriteError.type;
                 if (error.code === 401 && errType === 'user_session_already_exists') {
                     try {
                         console.debug('[auth] login: server reported session exists, trying to retrieve it via checkSession');

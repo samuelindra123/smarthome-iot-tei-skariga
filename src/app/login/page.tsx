@@ -27,12 +27,13 @@ export default function LoginPage() {
             console.debug('calling login()...');
             await login(email, password);
             console.debug('login() resolved');
-        } catch (err: any) {
+        } catch (err: unknown) {
             // Jika Appwrite mengembalikan pesan, tampilkan ke pengguna
-            if (err && err.type === 'user_session_already_exists') {
+            const error = err as { type?: string; message?: string };
+            if (error && error.type === 'user_session_already_exists') {
                 setError('Sesi pengguna sudah aktif pada browser ini. Anda sudah login — diarahkan ke dashboard.');
-            } else if (err && err.message) {
-                setError(`Gagal login: ${err.message}`);
+            } else if (error && error.message) {
+                setError(`Gagal login: ${error.message}`);
             } else {
                 setError('Gagal login. Periksa kembali email dan password Anda.');
             }

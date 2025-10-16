@@ -2,10 +2,45 @@
 
 import Link from 'next/link';
 import AuthGuard from '@/components/AuthGuard';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { MqttClient } from 'mqtt';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { PRESENCE_TOPIC, presenceFromPayload, PresenceModel, evaluateTimeout } from '@/lib/presence';
 import { useMqtt } from '@/lib/mqtt';
+
+// Type definitions for Web Speech API
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+  resultIndex: number;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+  message: string;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives?: number;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+interface SpeechRecognitionStatic {
+  new(): SpeechRecognition;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionStatic;
+    webkitSpeechRecognition?: SpeechRecognitionStatic;
+    AudioContext?: typeof AudioContext;
+    webkitAudioContext?: typeof AudioContext;
+  }
+}
 
 // Same broker URL used elsewhere
 const MQTT_BROKER_URL: string = 'wss://mqtt.tecnoverse.app:8081';
@@ -38,7 +73,7 @@ export default function VoiceControlPage() {
   const audioSupported = useMemo(() => {
     if (typeof window === 'undefined') return false;
     const hasMedia = !!navigator.mediaDevices?.getUserMedia;
-    const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+    const AC = window.AudioContext || window.webkitAudioContext;
     return hasMedia && !!AC;
   }, []);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -69,10 +104,9 @@ export default function VoiceControlPage() {
   }, [client, onMessage, subscribe]);
 
   // Speech Recognition
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const canUseSpeech = useMemo(() => {
     if (typeof window === 'undefined') return false;
-    // @ts-ignore
     return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
   }, []);
   const speechReady = mounted && canUseSpeech;
@@ -81,14 +115,16 @@ export default function VoiceControlPage() {
 
   useEffect(() => {
     if (!canUseSpeech) return;
-    // @ts-ignore
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
     const recognition = new SpeechRecognition();
     recognition.lang = 'id-ID';
     recognition.continuous = false;
     recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-    recognition.onresult = (event: any) => {
+    if (recognition.maxAlternatives !== undefined) {
+      recognition.maxAlternatives = 1;
+    }
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interim = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const t = event.results[i][0].transcript;
@@ -102,8 +138,9 @@ export default function VoiceControlPage() {
       }
     };
     recognition.onend = () => setListening(false);
-    recognition.onerror = (e: any) => setLogs((l: LogEntry[])=>[...l,{ts:Date.now(), text:`Speech error: ${e.error}`, type:'err'}]);
+    recognition.onerror = (e: SpeechRecognitionErrorEvent) => setLogs((l: LogEntry[])=>[...l,{ts:Date.now(), text:`Speech error: ${e.error}`, type:'err'}]);
     recognitionRef.current = recognition;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canUseSpeech]);
 
   const startListening = () => {
@@ -113,7 +150,7 @@ export default function VoiceControlPage() {
       setTranscript('');
       // Start audio meter in parallel (best-effort)
       startAudioMeter().finally(() => {
-        try { recognitionRef.current.start(); } catch {}
+        try { recognitionRef.current?.start(); } catch {}
       });
     }
     catch { setListening(false); }
@@ -132,7 +169,8 @@ export default function VoiceControlPage() {
     if (!audioSupported) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
-      const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
       const ctx: AudioContext = new AC();
       const source = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
@@ -185,8 +223,9 @@ export default function VoiceControlPage() {
     try {
       sharedPublish(`smarthome/${deviceId}/perintah`, cmd);
       setLogs((l: LogEntry[])=>[...l,{ts:Date.now(), text:`${c.connected ? 'Kirim' : 'Antri (offline)'}: ${cmd} -> ${deviceId}`, type:'cmd'}]);
-    } catch (e:any) {
-      setLogs((l: LogEntry[])=>[...l,{ts:Date.now(), text:`Gagal publish: ${e?.message || e}`, type:'err'}]);
+    } catch (e:unknown) {
+      const err = e as { message?: string };
+      setLogs((l: LogEntry[])=>[...l,{ts:Date.now(), text:`Gagal publish: ${err?.message || String(e)}`, type:'err'}]);
     }
   };
 
@@ -233,12 +272,13 @@ export default function VoiceControlPage() {
     return { deviceId, cmd };
   };
 
-  const handleSpeechCommand = (speech: string) => {
+  const handleSpeechCommand = useCallback((speech: string) => {
     const { deviceId, cmd } = parseCommand(speech);
-    if (!cmd) { setLogs((l: LogEntry[])=>[...l,{ts:Date.now(), text:`Tidak mengenali perintah dari: "${speech}"`, type:'warn'}]); return; }
-    if (!deviceId) { setLogs((l: LogEntry[])=>[...l,{ts:Date.now(), text:`Perangkat tidak dikenali dari: "${speech}"`, type:'warn'}]); return; }
+    if (!cmd) { setLogs((l: LogEntry[])=>[...l,{ts:Date.now(), text:`Tidak mengenali perintah dari: &ldquo;${speech}&rdquo;`, type:'warn'}]); return; }
+    if (!deviceId) { setLogs((l: LogEntry[])=>[...l,{ts:Date.now(), text:`Perangkat tidak dikenali dari: &ldquo;${speech}&rdquo;`, type:'warn'}]); return; }
     publish(deviceId, cmd);
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client, sharedPublish]);
 
   const presenceBadge = () => {
     if (presence.state==='offline') return <span className="px-2 py-1 rounded bg-red-600/30 text-red-200 text-[10px] border border-red-500/50">Device Offline</span>;
@@ -257,7 +297,7 @@ export default function VoiceControlPage() {
               {!connected && <span className="px-2 py-1 rounded bg-red-500/20 text-red-300 text-[10px] border border-red-600/40 animate-pulse">Broker Offline</span>}
               {presenceBadge()}
             </div>
-            <p className="text-sm md:text-base text-gray-400 max-w-2xl leading-relaxed">Kontrol perangkat dengan perintah suara bahasa Indonesia. Contoh: "Nyalakan lampu teras", "Matikan stop kontak TV".</p>
+            <p className="text-sm md:text-base text-gray-400 max-w-2xl leading-relaxed">Kontrol perangkat dengan perintah suara bahasa Indonesia. Contoh: &ldquo;Nyalakan lampu teras&rdquo;, &ldquo;Matikan stop kontak TV&rdquo;.</p>
             <div className="flex flex-wrap gap-3 text-[11px] text-gray-300">
               <span className="px-2 py-1 rounded bg-gray-800/60 border border-gray-700">Broker: {MQTT_BROKER_URL.replace(/^wss?:\/\//,'')}</span>
               <span className="px-2 py-1 rounded bg-gray-800/60 border border-gray-700">Presence: {presence.state.toUpperCase()}</span>
@@ -326,7 +366,7 @@ export default function VoiceControlPage() {
               {transcript || 'Ucapkan perintah...'}
             </div>
             <div className="text-[11px] text-gray-400">
-              Contoh frasa: "nyalakan lampu ruang tamu", "matikan lampu teras", "hidupkan stop kontak tv".
+              Contoh frasa: &ldquo;nyalakan lampu ruang tamu&rdquo;, &ldquo;matikan lampu teras&rdquo;, &ldquo;hidupkan stop kontak tv&rdquo;.
             </div>
           </div>
 

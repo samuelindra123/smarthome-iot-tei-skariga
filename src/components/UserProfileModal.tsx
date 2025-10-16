@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface UserProfileModalProps {
   open: boolean;
   onClose: () => void;
-  user: any | null; // user document from DB
+  user: { name?: string; role?: string; $id?: string; email?: string; $createdAt?: string } | null; // user document from DB
   onSave?: (data: { name: string; role: string }) => Promise<void>;
 }
 
@@ -85,7 +85,7 @@ export default function UserProfileModal({ open, onClose, user, onSave }: UserPr
               </div>
               <div>
                 <label className="block text-xs text-gray-400 mb-1">Dibuat pada</label>
-                <div className="text-gray-400 text-xs font-mono">{new Date(user.$createdAt).toLocaleString('id-ID')}</div>
+                <div className="text-gray-400 text-xs font-mono">{user.$createdAt ? new Date(user.$createdAt).toLocaleString('id-ID') : 'N/A'}</div>
               </div>
             </div>
 

@@ -28,7 +28,7 @@ export async function POST(request: Request) {
         const newUser = await users.create(
             ID.unique(),
             email,
-            null,
+            undefined,
             password,
             name
         );
@@ -46,10 +46,11 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ message: 'Pengguna berhasil dibuat!', user: newUser }, { status: 201 });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Error membuat pengguna:', error);
         // Tangani error jika pengguna sudah ada
-        if (error.code === 409) {
+        const err = error as { code?: number };
+        if (err.code === 409) {
              return NextResponse.json({ message: 'Pengguna dengan email ini sudah ada.' }, { status: 409 });
         }
         return NextResponse.json({ message: 'Terjadi kesalahan pada server.' }, { status: 500 });

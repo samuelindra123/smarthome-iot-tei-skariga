@@ -30,7 +30,7 @@ export default function AdminDashboardPage() {
     const [newRole, setNewRole] = useState<'user' | 'admin'>('user');
     const [formMessage, setFormMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
     const [isCreatingUser, setIsCreatingUser] = useState(false);
-    const [selectedUser, setSelectedUser] = useState<any | null>(null);
+    const [selectedUser, setSelectedUser] = useState<UserDocument | null>(null);
     const [showProfile, setShowProfile] = useState(false);
 
     const fetchUsers = async () => {
@@ -83,8 +83,9 @@ export default function AdminDashboardPage() {
             // Muat ulang daftar pengguna
             await fetchUsers();
 
-        } catch (err: any) {
-            setFormMessage({ type: 'error', text: err.message });
+        } catch (err: unknown) {
+            const error = err as { message?: string };
+            setFormMessage({ type: 'error', text: error.message || 'Gagal membuat pengguna' });
         } finally {
             setIsCreatingUser(false);
         }

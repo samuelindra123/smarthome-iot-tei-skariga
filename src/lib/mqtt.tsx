@@ -62,7 +62,7 @@ export function MqttProvider({ children }: { children: React.ReactNode }) {
         for (const s of subs) {
           try {
             c.subscribe(s.topics, (err) => s.cb?.(err || undefined));
-          } catch (e: any) {
+          } catch (e: unknown) {
             s.cb?.(e instanceof Error ? e : new Error(String(e)));
           }
         }
@@ -76,9 +76,9 @@ export function MqttProvider({ children }: { children: React.ReactNode }) {
       c.on('reconnect', onReconnect);
       c.on('close', onClose);
       c.on('message', onMessage);
-      c.on('error', (err: any) => {
+      c.on('error', (err: unknown) => {
         // quieter logging: warn once about connectivity and attempt fallback for wss->ws once
-        const msg = err && err.message ? err.message : String(err);
+        const msg = err && typeof err === 'object' && 'message' in err ? (err as Error).message : String(err);
         console.warn('[mqtt] connection issue:', msg);
         setConnected(false);
 
@@ -127,7 +127,7 @@ export function MqttProvider({ children }: { children: React.ReactNode }) {
       pendingSubs.current.push({ topics, cb });
       return;
     }
-    try { c.subscribe(topics, (err) => cb?.(err || undefined)); } catch (e: any) { cb?.(e); }
+    try { c.subscribe(topics, (err) => cb?.(err || undefined)); } catch (e: unknown) { cb?.(e instanceof Error ? e : new Error(String(e))); }
   }, []);
 
   const onMessage = useCallback((handler: (topic: string, payload: Buffer) => void) => {

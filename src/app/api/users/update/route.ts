@@ -16,8 +16,9 @@ export async function PUT(request: Request) {
 
     const updated = await databases.updateDocument(process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!, process.env.NEXT_PUBLIC_APPWRITE_USERS_COLLECTION_ID!, id, { name, role });
     return NextResponse.json({ message: 'Updated', updated }, { status: 200 });
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('update user error', e);
-    return NextResponse.json({ message: e.message || 'Server error' }, { status: 500 });
+    const err = e as { message?: string };
+    return NextResponse.json({ message: err.message || 'Server error' }, { status: 500 });
   }
 }
