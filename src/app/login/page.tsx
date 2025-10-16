@@ -20,15 +20,12 @@ export default function LoginPage() {
             return;
         }
 
-        console.debug('handleSubmit: attempting login for', email);
         setError(null);
         try {
             // Fungsi login sekarang akan otomatis mengarahkan ke /dashboard
-            console.debug('calling login()...');
             await login(email, password);
-            console.debug('login() resolved');
         } catch (err: unknown) {
-            // Jika Appwrite mengembalikan pesan, tampilkan ke pengguna
+            // Jika Appwrite mengembalikan pesan, tampilkan ke pengguna dengan pesan yang ramah
             const error = err as { type?: string; message?: string };
             if (error && error.type === 'user_session_already_exists') {
                 setError('Sesi pengguna sudah aktif pada browser ini. Anda sudah login — diarahkan ke dashboard.');
@@ -37,7 +34,6 @@ export default function LoginPage() {
             } else {
                 setError('Gagal login. Periksa kembali email dan password Anda.');
             }
-            console.error('Login error:', err);
         }
     };
 
@@ -102,8 +98,16 @@ export default function LoginPage() {
                             </button>
                         </div>
                         <div className="mt-4 text-xs text-gray-400">
-                            <p>Debug: isLoading = {String(isLoading)}</p>
-                            <p className="italic">Buka console browser (F12) untuk log tambahan.</p>
+                            <p className="mb-2">Butuh akses akun atau mengalami masalah login?</p>
+                            <p>
+                                Hubungi admin untuk meminta akses atau bantuan. Tekan tombol di bawah untuk membuka chat WhatsApp.
+                            </p>
+                            <div className="mt-3">
+                                {/* TODO: ganti nomor telepon berikut dengan nomor admin Anda */}
+                                <a href={`https://wa.me/6281234567890?text=Halo%20Admin%2C%20saya%20butuh%20akses%20akun`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 rounded bg-green-600 hover:bg-green-500 text-white text-sm">
+                                    Hubungi Admin via WhatsApp
+                                </a>
+                            </div>
                         </div>
                     </form>
                 </div>
