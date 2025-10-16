@@ -9,7 +9,8 @@
 //  - Online condition:
 //      * Payload 'online' OR any accepted heartbeat/status update (source: 'heartbeat'/'status')
 
-export const PRESENCE_TOPIC = 'smarthome/device/esp32s2mini/presence';
+// FIXED: Match actual MQTT topic from ESP32 device (visible in MQTT Explorer)
+export const PRESENCE_TOPIC = 'smarthome/controller/presence';
 
 export interface PresenceModel {
   state: 'online' | 'offline' | 'unknown';
@@ -24,15 +25,20 @@ export const HEARTBEAT_INTERVAL_MS = 5_000; // expected device heartbeat or stat
 export const OFFLINE_TIMEOUT_MS = HEARTBEAT_INTERVAL_MS * 2; // fallback threshold (10s instead of 30s)
 
 export function evaluateTimeout(prev: PresenceModel): PresenceModel {
+  // Don't evaluate timeout if no presence data received yet
   if (!prev.lastSeen) return prev;
   
-  // If already marked offline by LWT, don't override
+  // If already marked offline by LWT, NEVER override - wait for explicit 'online' message
   if (prev.state === 'offline' && prev.source === 'lwt') return prev;
   
-  const delta = Date.now() - prev.lastSeen;
-  if (delta > OFFLINE_TIMEOUT_MS && prev.state !== 'offline') {
-    return { ...prev, state: 'offline', source: 'timeout', reason: `No heartbeat > ${Math.round(OFFLINE_TIMEOUT_MS/1000)}s` };
+  // Only apply timeout if device was previously online
+  if (prev.state === 'online') {
+    const delta = Date.now() - prev.lastSeen;
+    if (delta > OFFLINE_TIMEOUT_MS) {
+      return { ...prev, state: 'offline', source: 'timeout', reason: `No heartbeat > ${Math.round(OFFLINE_TIMEOUT_MS/1000)}s` };
+    }
   }
+  
   return prev;
 }
 

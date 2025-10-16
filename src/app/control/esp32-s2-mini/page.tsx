@@ -43,7 +43,14 @@ export default function ControlEsp32S2MiniPage() {
 
   useEffect(() => {
     if (!client) return;
-    client.subscribe(['smarthome/+/status', PRESENCE_TOPIC], (err) => { if (err) console.error('Gagal subscribe:', err); });
+    // Subscribe to device status topics AND presence topic (will receive retained messages)
+    client.subscribe(['smarthome/+/status', PRESENCE_TOPIC], (err) => { 
+      if (err) {
+        console.error('Gagal subscribe:', err);
+      } else {
+        console.log('✅ Subscribed to device status and presence topics');
+      }
+    });
     const handler = (topic: string, message: Buffer) => {
       const deviceId = topic.split('/')[1];
       const newStatus = message.toString() as DeviceStatus;
@@ -57,23 +64,23 @@ export default function ControlEsp32S2MiniPage() {
         });
         setAnimating(a=>({ ...a, [deviceId]: true }));
         setTimeout(()=> setAnimating(a=> ({ ...a, [deviceId]: false })), 600);
-        // Treat status message as heartbeat (refresh presence if already online/unknown)
-        setPresence(p => {
-          if (p.state === 'offline') return p; // don't auto-resurrect without explicit presence
-          return { ...p, state: p.state === 'unknown' ? 'online' : p.state, lastSeen: Date.now(), source: 'status' };
-        });
+        // DO NOT update presence from status messages - only follow explicit presence topic!
+        // Status messages are just for device state (ON/OFF), not for presence detection.
       } else if (topic === PRESENCE_TOPIC) {
         const payload = message.toString();
         const meta = presenceFromPayload(payload);
-        setPresence(p => ({
-          ...p,
+        
+        // INSTANT presence detection from MQTT - this is the ONLY source of truth
+        setPresence({
           state: meta.state,
-          // INSTANT offline detection: when LWT 'offline' received, mark as offline immediately
-          lastSeen: meta.state === 'online' ? Date.now() : (meta.source === 'lwt' ? p.lastSeen : Date.now()),
+          // Update lastSeen only when online, preserve it when offline (for timeout calculation)
+          lastSeen: meta.state === 'online' ? Date.now() : (meta.source === 'lwt' ? null : Date.now()),
           lastPayload: payload,
           source: meta.source,
-          reason: meta.state === 'offline' ? (meta.source === 'lwt' ? 'Device disconnected (LWT)' : 'Timeout') : undefined
-        }));
+          reason: meta.state === 'offline' ? 'Device disconnected (MQTT LWT)' : undefined
+        });
+        
+        console.log(`📡 Presence from MQTT: ${meta.state} (source: ${meta.source})`);
       }
     };
     client.on('message', handler);
@@ -84,6 +91,14 @@ export default function ControlEsp32S2MiniPage() {
     // Block command if broker not connected yet
     if (!client || !client.connected || !connected) {
       setCommandWarnings(w => ({ ...w, [deviceId]: { msg: 'Tidak terkoneksi ke broker. Perintah dibatalkan.', ts: Date.now() } }));
+      setTimeout(() => setCommandWarnings(w => {
+        const copy = { ...w }; Object.entries(copy).forEach(([id, val]) => { if (Date.now() - val.ts > 3000) delete copy[id]; }); return copy;
+      }), 3200);
+      return;
+    }
+    // Block if device is offline (based on MQTT presence)
+    if (presence.state !== 'online') {
+      setCommandWarnings(w => ({ ...w, [deviceId]: { msg: 'Device offline. Tidak dapat mengirim perintah.', ts: Date.now() } }));
       setTimeout(() => setCommandWarnings(w => {
         const copy = { ...w }; Object.entries(copy).forEach(([id, val]) => { if (Date.now() - val.ts > 3000) delete copy[id]; }); return copy;
       }), 3200);
