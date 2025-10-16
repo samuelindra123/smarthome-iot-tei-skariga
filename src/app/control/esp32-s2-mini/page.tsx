@@ -33,11 +33,11 @@ export default function ControlEsp32S2MiniPage() {
   // Presence model (device-level, not broker connection)
   const [presence, setPresence] = useState<PresenceModel>({ state: 'unknown', lastSeen: null, lastPayload: null, source: undefined });
 
-  // Periodic timeout evaluation for presence
+  // Periodic timeout evaluation for presence (reduced from 3s to 2s for faster response)
   useEffect(() => {
     const id = setInterval(() => {
       setPresence(p => evaluateTimeout(p));
-    }, 3000);
+    }, 2000);
     return () => clearInterval(id);
   }, []);
 
@@ -67,11 +67,12 @@ export default function ControlEsp32S2MiniPage() {
         const meta = presenceFromPayload(payload);
         setPresence(p => ({
           ...p,
-            state: meta.state,
-            lastSeen: meta.state === 'online' ? Date.now() : p.lastSeen,
-            lastPayload: payload,
-            source: meta.source,
-            reason: meta.state === 'offline' ? 'LWT/offline signal' : undefined
+          state: meta.state,
+          // INSTANT offline detection: when LWT 'offline' received, mark as offline immediately
+          lastSeen: meta.state === 'online' ? Date.now() : (meta.source === 'lwt' ? p.lastSeen : Date.now()),
+          lastPayload: payload,
+          source: meta.source,
+          reason: meta.state === 'offline' ? (meta.source === 'lwt' ? 'Device disconnected (LWT)' : 'Timeout') : undefined
         }));
       }
     };
