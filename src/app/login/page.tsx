@@ -3,6 +3,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 
 export default function LoginPage() {
@@ -99,14 +100,11 @@ export default function LoginPage() {
                         </div>
                         <div className="mt-4 text-xs text-gray-400">
                             <p className="mb-2">Butuh akses akun atau mengalami masalah login?</p>
-                            <p>
-                                Hubungi admin untuk meminta akses atau bantuan. Tekan tombol di bawah untuk membuka chat WhatsApp.
-                            </p>
+                            <p>Hubungi admin untuk meminta akses atau bantuan.</p>
                             <div className="mt-3">
-                                {/* TODO: ganti nomor telepon berikut dengan nomor admin Anda */}
-                                <a href={`https://wa.me/6281234567890?text=Halo%20Admin%2C%20saya%20butuh%20akses%20akun`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 rounded bg-green-600 hover:bg-green-500 text-white text-sm">
-                                    Hubungi Admin via WhatsApp
-                                </a>
+                                <Link href="/hubungi-admin" className="inline-flex items-center gap-2 px-4 py-2 rounded bg-yellow-500 hover:bg-yellow-400 text-black text-sm font-semibold">
+                                    Halaman Hubungi Admin
+                                </Link>
                             </div>
                         </div>
                     </form>
