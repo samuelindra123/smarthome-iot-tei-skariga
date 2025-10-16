@@ -19,7 +19,7 @@ export default function Header() {
             <Link href="/roadmap" className="hover:text-yellow-400 transition-colors">Roadmap</Link>
             <Link href="/docs" className="hover:text-yellow-400 transition-colors">Docs</Link>
             <Link href="/sourcecode" className="hover:text-yellow-400 transition-colors">Source</Link>
-            <Link href="/dokumentasi" className="hover:text-yellow-400 transition-colors">PDF</Link>
+            <Link href="/dokumentasi" className="hover:text-yellow-400 transition-colors">Infrastructure</Link>
           </nav>
         </div>
 
@@ -54,7 +54,7 @@ export default function Header() {
             <Link href="/roadmap" className="px-3 py-2 rounded hover:bg-gray-800">Roadmap</Link>
             <Link href="/docs" className="px-3 py-2 rounded hover:bg-gray-800">Docs</Link>
             <Link href="/sourcecode" className="px-3 py-2 rounded hover:bg-gray-800">Source</Link>
-            <Link href="/dokumentasi" className="px-3 py-2 rounded hover:bg-gray-800">PDF</Link>
+            <Link href="/dokumentasi" className="px-3 py-2 rounded hover:bg-gray-800">Infrastructure</Link>
             <div className="pt-2 border-t border-gray-800">
               <Link href="/login" className="block w-full text-center bg-yellow-500 text-black font-semibold px-4 py-2 rounded mt-2">Login</Link>
             </div>
