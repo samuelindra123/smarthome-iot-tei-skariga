@@ -81,13 +81,13 @@ export default function VoiceControlPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
 
-  // Periodic presence timeout evaluation
+  // Periodic presence timeout evaluation (faster for real-time response)
   useEffect(() => {
-    const id = setInterval(() => setPresence((p: PresenceModel) => evaluateTimeout(p)), 3000);
+    const id = setInterval(() => setPresence((p: PresenceModel) => evaluateTimeout(p)), 2000);
     return () => clearInterval(id);
   }, []);
 
-  // MQTT setup
+  // MQTT setup - Real-time presence detection
   useEffect(() => {
     // Subscribe presence once client ready
     if (!client) return;
@@ -96,12 +96,24 @@ export default function VoiceControlPage() {
       if (topic === PRESENCE_TOPIC) {
         const payload = msg.toString();
         const meta = presenceFromPayload(payload);
-        setPresence((p: PresenceModel) => ({ ...p, state: meta.state, lastSeen: meta.state==='online'?Date.now():p.lastSeen, lastPayload: payload, source: meta.source, reason: meta.state==='offline'?'LWT/offline signal':undefined }));
+        
+        // INSTANT presence detection from MQTT - ONLY source of truth
+        setPresence({
+          state: meta.state,
+          lastSeen: meta.state === 'online' ? Date.now() : null,
+          lastPayload: payload,
+          source: meta.source,
+          reason: meta.state === 'offline' ? 'Device disconnected (MQTT LWT)' : undefined
+        });
+        
+        setLogs((l: LogEntry[])=>[...l,{ts:Date.now(), text:`Presence: ${meta.state} (${meta.source})`, type:'info'}]);
       }
     });
-    setLogs((l: LogEntry[])=>[...l,{ts:Date.now(), text:'Terhubung ke broker MQTT', type:'info'}]);
+    if (connected) {
+      setLogs((l: LogEntry[])=>[...l,{ts:Date.now(), text:'Terhubung ke broker MQTT', type:'info'}]);
+    }
     return () => off();
-  }, [client, onMessage, subscribe]);
+  }, [client, onMessage, subscribe, connected]);
 
   // Speech Recognition
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -292,15 +304,24 @@ export default function VoiceControlPage() {
       <div className="max-w-5xl mx-auto space-y-10">
         <header className="flex flex-col lg:flex-row lg:items-end gap-8">
           <div className="flex-1 space-y-4">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-4xl md:text-5xl font-bold tracking-tight">Voice Control</h1>
-              {!connected && <span className="px-2 py-1 rounded bg-red-500/20 text-red-300 text-[10px] border border-red-600/40 animate-pulse">Broker Offline</span>}
+              {/* Real-time broker status */}
+              {!connected ? (
+                <span className="px-2 py-1 rounded bg-red-500/20 text-red-300 text-[10px] border border-red-600/40 animate-pulse">Broker Disconnected</span>
+              ) : (
+                <span className="px-2 py-1 rounded bg-green-500/20 text-green-300 text-[10px] border border-green-600/40">Broker Connected</span>
+              )}
+              {/* Real-time device presence */}
               {presenceBadge()}
             </div>
             <p className="text-sm md:text-base text-gray-400 max-w-2xl leading-relaxed">Kontrol perangkat dengan perintah suara bahasa Indonesia. Contoh: &ldquo;Nyalakan lampu teras&rdquo;, &ldquo;Matikan stop kontak TV&rdquo;.</p>
             <div className="flex flex-wrap gap-3 text-[11px] text-gray-300">
-              <span className="px-2 py-1 rounded bg-gray-800/60 border border-gray-700">Broker: {MQTT_BROKER_URL.replace(/^wss?:\/\//,'')}</span>
-              <span className="px-2 py-1 rounded bg-gray-800/60 border border-gray-700">Presence: {presence.state.toUpperCase()}</span>
+              <span className="px-2 py-1 rounded bg-gray-800/60 border border-gray-700">Broker: {connected ? '✓ Connected' : '✗ Disconnected'}</span>
+              <span className={`px-2 py-1 rounded border ${presence.state === 'online' ? 'bg-green-800/40 border-green-700 text-green-300' : presence.state === 'offline' ? 'bg-red-800/40 border-red-700 text-red-300' : 'bg-gray-800/60 border-gray-700'}`}>
+                Device: {presence.state.toUpperCase()}
+              </span>
+              {presence.source && <span className="px-2 py-1 rounded bg-gray-800/60 border border-gray-700">Source: {presence.source}</span>}
             </div>
           </div>
           <div className="flex flex-col gap-3 self-start lg:self-center">

@@ -61,15 +61,14 @@ export default function MonitorPage() {
     stopkontak2: statuses['smarthome/stopkontak2/status']?.lastPayload || 'UNKNOWN'
   };
 
-  // Age timer + auto offline
+  // Age timer + real-time presence evaluation (reduced interval for faster response)
   useEffect(() => {
     const id = setInterval(() => {
       setPresenceState(p => evaluateTimeout(p));
       setPresence(p => {
         if (!p.lastSeen) return { ...p, lastDeltaSec: 0 };
         const deltaMs = Date.now() - p.lastSeen;
-        const offline = deltaMs > PRESENCE_TIMEOUT_MS;
-        return { connected: offline ? false : p.connected, lastSeen: p.lastSeen, lastDeltaSec: Math.floor(deltaMs/1000) };
+        return { connected: p.connected, lastSeen: p.lastSeen, lastDeltaSec: Math.floor(deltaMs/1000) };
       });
     }, 1000);
     return () => clearInterval(id);
@@ -95,25 +94,33 @@ export default function MonitorPage() {
             next[topic] = { topic, lastPayload: payload, lastUpdated: now, retained };
           return next;
         });
-        // Treat status as heartbeat refresh (do not revive if explicit offline from LWT)
-        setPresence(p => ({ connected: true, lastSeen: now, lastDeltaSec: 0 }));
-        setPresenceState(ps => ps.state === 'offline' ? ps : { ...ps, state: ps.state === 'unknown' ? 'online' : ps.state, lastSeen: now, source: 'status' });
+        // DO NOT update presence from status messages - only update lastSeen if already online
+        if (presenceState.state === 'online') {
+          setPresence(p => ({ ...p, lastSeen: now, lastDeltaSec: 0 }));
+        }
+        // Never auto-resurrect from offline state
       }
 
-      // presence payload
+      // INSTANT presence detection from MQTT topic (ONLY source of truth)
       if (topic === PRESENCE_TOPIC) {
         setPresencePayload(payload);
         const meta = presenceFromPayload(payload);
-        setPresenceState(ps => ({
-          ...ps,
+        
+        // Real-time presence update - never override LWT offline
+        setPresenceState({
           state: meta.state,
-          lastSeen: meta.state === 'online' ? Date.now() : ps.lastSeen,
+          lastSeen: meta.state === 'online' ? Date.now() : null,
           source: meta.source,
           lastPayload: payload,
-          reason: meta.state === 'offline' ? 'LWT/offline signal' : undefined
-        }));
-        if (meta.state === 'online') setPresence(p => ({ connected: true, lastSeen: Date.now(), lastDeltaSec: 0 }));
-        if (meta.state === 'offline') setPresence(p => ({ ...p, connected: false }));
+          reason: meta.state === 'offline' ? 'Device disconnected (MQTT LWT)' : undefined
+        });
+        
+        // Update legacy presence state for UI
+        if (meta.state === 'online') {
+          setPresence({ connected: true, lastSeen: Date.now(), lastDeltaSec: 0 });
+        } else if (meta.state === 'offline') {
+          setPresence(p => ({ ...p, connected: false }));
+        }
       }
 
       setMessages(m => {
