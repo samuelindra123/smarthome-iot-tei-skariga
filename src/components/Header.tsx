@@ -20,6 +20,7 @@ export default function Header() {
         <div className="flex-1 flex justify-center">
           <nav className="hidden sm:flex items-center gap-6 text-sm">
             <Link href="/" className="hover:text-yellow-400 transition-colors">Beranda</Link>
+            <Link href="/download" className="hover:text-yellow-400 transition-colors">Download</Link>
             <Link href="/team" className="hover:text-yellow-400 transition-colors">Team & Developers</Link>
             <Link href="/roadmap" className="hover:text-yellow-400 transition-colors">Roadmap</Link>
             <Link href="/docs" className="hover:text-yellow-400 transition-colors">Docs</Link>
@@ -55,6 +56,7 @@ export default function Header() {
         <div className="sm:hidden bg-gray-900 border-t border-gray-800">
           <div className="max-w-6xl mx-auto px-4 py-3 flex flex-col gap-2">
             <Link href="/" className="px-3 py-2 rounded hover:bg-gray-800">Beranda</Link>
+              <Link href="/download" className="px-3 py-2 rounded hover:bg-gray-800">Download</Link>
             <Link href="/team" className="px-3 py-2 rounded hover:bg-gray-800">Team & Developers</Link>
             <Link href="/roadmap" className="px-3 py-2 rounded hover:bg-gray-800">Roadmap</Link>
             <Link href="/docs" className="px-3 py-2 rounded hover:bg-gray-800">Docs</Link>
