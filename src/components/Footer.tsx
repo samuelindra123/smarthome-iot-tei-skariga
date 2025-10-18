@@ -1,4 +1,9 @@
+import { useDisplayMode } from '../lib/useDisplayMode';
+
 export default function Footer() {
+  const { isStandalone } = useDisplayMode();
+  if (isStandalone) return null;
+
   return (
     <footer className="mt-24 w-full border-t border-gray-800 bg-gray-950/70 backdrop-blur py-10 text-sm">
       <div className="max-w-6xl mx-auto px-6 grid gap-8 md:grid-cols-3">

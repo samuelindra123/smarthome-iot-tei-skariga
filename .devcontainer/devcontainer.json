@@ -1,0 +1,24 @@
+{
+  "name": "Android TWA Codespace",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "11"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "remoteUser": "vscode",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vscjava.vscode-java-pack",
+        "msjsdiag.debugger-for-chrome",
+        "ms-vscode.js-debug",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  }
+}

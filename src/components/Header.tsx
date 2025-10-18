@@ -1,8 +1,13 @@
 import Link from 'next/link';
 import { useState } from 'react';
+import { useDisplayMode } from '../lib/useDisplayMode';
 
 export default function Header() {
   const [open, setOpen] = useState(false);
+  const { isStandalone } = useDisplayMode();
+
+  // Hide global header in standalone/TWA mode — the app uses app chrome instead
+  if (isStandalone) return null;
 
   return (
     <header className="w-full bg-gray-900/70 backdrop-blur border-b border-gray-800 sticky top-0 z-50">
