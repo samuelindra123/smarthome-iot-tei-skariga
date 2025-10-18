@@ -30,6 +30,7 @@ export default function RootLayout({
   return (
   <html lang="id" data-scroll-behavior="smooth" className="scroll-smooth">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white selection:bg-yellow-500/30 selection:text-yellow-100`}>
+        <link rel="manifest" href="/manifest.json" />
         <AuthProvider>
           <MqttProvider>
             {/* GlobalChrome will hide Header/Footer on admin routes */}
