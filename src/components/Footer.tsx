@@ -1,3 +1,5 @@
+"use client";
+
 import { useDisplayMode } from '../lib/useDisplayMode';
 
 export default function Footer() {
