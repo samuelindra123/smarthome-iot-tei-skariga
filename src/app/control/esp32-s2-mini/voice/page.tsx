@@ -80,6 +80,12 @@ export default function VoiceControlPage() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
+  // MediaRecorder fallback for mobile where Web Speech API is not available
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const [recording, setRecording] = useState(false);
+  const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
+  const [micPermission, setMicPermission] = useState<'unknown'|'granted'|'denied'>('unknown');
 
   // Periodic presence timeout evaluation (faster for real-time response)
   useEffect(() => {
@@ -124,6 +130,27 @@ export default function VoiceControlPage() {
   const speechReady = mounted && canUseSpeech;
 
   useEffect(() => { setMounted(true); }, []);
+
+  // Query microphone permission if possible
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('permissions' in navigator)) return;
+    // navigator.permissions may not support 'microphone' in all browsers
+    // try/catch to avoid throwing
+    try {
+      // 'microphone' permission name may not be in DOM lib for all TS configs — use a narrow local type instead of `any`
+      type PermissionsQuery = { query: (descriptor: { name: string }) => Promise<PermissionStatus> };
+      (navigator.permissions as unknown as PermissionsQuery).query({ name: 'microphone' }).then((res: PermissionStatus) => {
+        if (res.state === 'granted') setMicPermission('granted');
+        else if (res.state === 'denied') setMicPermission('denied');
+        else setMicPermission('unknown');
+        res.onchange = () => {
+          if (res.state === 'granted') setMicPermission('granted');
+          else if (res.state === 'denied') setMicPermission('denied');
+          else setMicPermission('unknown');
+        };
+      }).catch(() => {});
+    } catch (e) {}
+  }, []);
 
   useEffect(() => {
     if (!canUseSpeech) return;
@@ -174,13 +201,25 @@ export default function VoiceControlPage() {
   };
 
   const toggleListening = () => {
-    if (listening) stopListening(); else startListening();
+    // Prefer Web Speech API when available
+    if (canUseSpeech) {
+      if (listening) stopListening(); else startListening();
+      return;
+    }
+    // Otherwise use MediaRecorder fallback when audio is supported
+    if (audioSupported) {
+      if (recording) stopRecording(); else startRecording();
+      return;
+    }
+    // No available mic capability
+    setLogs((l)=>[...l,{ts:Date.now(), text:'Perangkat ini tidak mendukung mikrofon atau STT', type:'warn'}]);
   };
 
   const startAudioMeter = async () => {
     if (!audioSupported) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      setMicPermission('granted');
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
       const ctx: AudioContext = new AC();
@@ -211,7 +250,50 @@ export default function VoiceControlPage() {
     } catch (e) {
       // No animation if mic capture fails
       setVolume(0);
+      setMicPermission('denied');
     }
+  };
+
+  // MediaRecorder fallback: record audio blob for manual transcription or offline processing
+  const startRecording = async () => {
+    try {
+      setRecordedUrl(null);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      chunksRef.current = [];
+      const mr = new MediaRecorder(stream);
+      recorderRef.current = mr;
+      mr.ondataavailable = (ev) => { if (ev.data && ev.data.size) chunksRef.current.push(ev.data); };
+      mr.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        const url = URL.createObjectURL(blob);
+        setRecordedUrl(url);
+        // stop tracks
+        try { stream.getTracks().forEach(t => t.stop()); } catch {}
+      };
+      mr.start();
+      setRecording(true);
+      // Mirror listening state so UI shows 'listening' while recording
+      setListening(true);
+      // Start audio meter to show live volume while recording (best-effort)
+      startAudioMeter().catch(() => {});
+      setLogs((l)=>[...l,{ts:Date.now(), text:'Recording started (fallback)', type:'info'}]);
+    } catch (e: unknown) {
+      const msg = e && typeof e === 'object' && 'message' in e ? (e as { message?: unknown }).message : String(e);
+      setLogs((l)=>[...l,{ts:Date.now(), text:`Recording failed: ${msg}`, type:'err'}]);
+    }
+  };
+
+  const stopRecording = () => {
+    try {
+      recorderRef.current?.stop();
+    } catch {}
+    recorderRef.current = null;
+    setRecording(false);
+    // stop audio meter as recording ended
+    stopAudioMeter();
+    // clear listening indicator
+    setListening(false);
+    setLogs((l)=>[...l,{ts:Date.now(), text:'Recording stopped', type:'info'}]);
   };
 
   const stopAudioMeter = () => {
@@ -378,8 +460,27 @@ export default function VoiceControlPage() {
                   <span className={`font-medium ${listening ? 'text-emerald-300' : 'text-gray-300'}`}>
                     {listening ? 'Mendengarkan...' : 'Ketuk tombol mikrofon untuk mulai'}
                   </span>
+                ) : audioSupported ? (
+                  <div className="space-y-2">
+                    <div className="text-[11px] text-amber-300">Perangkat mendukung mikrofon, tetapi browser ini tidak mendukung Web Speech API (STT). Ini umum pada perangkat mobile.</div>
+                    <div className="flex items-center gap-2 justify-center">
+                      <button onClick={() => { startAudioMeter(); }} className="px-3 py-1 rounded bg-gray-800 border">Test Mikrofon</button>
+                      {!recording ? (
+                        <button onClick={startRecording} className="px-3 py-1 rounded bg-yellow-500 text-black">Mulai Rekam</button>
+                      ) : (
+                        <button onClick={stopRecording} className="px-3 py-1 rounded bg-red-600 text-white">Stop Rekam</button>
+                      )}
+                    </div>
+                    {recordedUrl && (
+                      <div className="mt-2 flex items-center gap-2 justify-center">
+                        <audio src={recordedUrl} controls />
+                        <a href={recordedUrl} download="voice-recording.webm" className="px-2 py-1 rounded bg-gray-800 border">Download</a>
+                      </div>
+                    )}
+                    <div className="text-[11px] text-gray-400">Jika Anda perlu STT di mobile, gunakan perangkat desktop atau gunakan layanan STT eksternal (belum tersedia di aplikasi ini).</div>
+                  </div>
                 ) : (
-                  <span className="text-[11px] text-amber-300">Browser tidak mendukung Web Speech API</span>
+                  <span className="text-[11px] text-amber-300">Browser tidak mendukung Web Speech API atau akses mikrofon.</span>
                 )
               )}
             </div>
