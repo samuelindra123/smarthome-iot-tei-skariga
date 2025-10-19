@@ -14,7 +14,7 @@ export default function DashboardHeader() {
       <div className="max-w-6xl mx-auto px-4 md:px-6 py-3 flex items-center justify-between">
         {/* Logo */}
         <div className="flex items-center">
-          <Link href="/" className="text-base md:text-lg font-bold">SmartHome SKARIGA</Link>
+          <Link href="/dashboard" className="text-base md:text-lg font-bold">SmartHome SKARIGA</Link>
         </div>
 
         {/* Desktop Navigation */}
