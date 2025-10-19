@@ -1,47 +1,19 @@
 // smarthome-dashboard-ts/src/app/layout.tsx
 
-import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
-import GlobalChrome from '@/components/GlobalChrome';
-import { MqttProvider } from '@/lib/mqtt';
-import { AuthProvider } from '@/context/AuthContext';
+import ClientProviders from './providers/ClientProviders';
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+// Force dynamic layout rendering to prevent accidental static export.
+export const dynamic = 'force-dynamic';
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export const metadata: Metadata = {
-  title: 'SmartHome SKARIGA',
-  description: 'Dashboard IoT ESP32-S2 Mini 4-Channel Relay oleh siswa SKARIGA',
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // Server layout that renders a client boundary for auth/mqtt providers.
   return (
-  <html lang="id" data-scroll-behavior="smooth" className="scroll-smooth">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white selection:bg-yellow-500/30 selection:text-yellow-100`}>
-        <link rel="manifest" href="/manifest.json" />
-        {/* favicon and PNG fallbacks */}
-        <link rel="icon" href="/favicon.ico" />
-        <link rel="icon" type="image/png" sizes="192x192" href="/icons/android-chrome-192x192.png" />
-        <AuthProvider>
-          <MqttProvider>
-            {/* GlobalChrome will hide Header/Footer on admin routes */}
-            <GlobalChrome>
-              {children}
-            </GlobalChrome>
-          </MqttProvider>
-        </AuthProvider>
+    <html lang="id">
+      <body>
+        <ClientProviders>
+          {children}
+        </ClientProviders>
       </body>
     </html>
   );

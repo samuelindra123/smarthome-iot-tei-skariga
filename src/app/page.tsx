@@ -1,5 +1,8 @@
 import Link from 'next/link';
 
+// Ensure this page is rendered dynamically (SSR) to avoid static export
+export const dynamic = 'force-dynamic';
+
 export default function HomePage() {
   return (
     <main className="min-h-screen w-full bg-gradient-to-b from-gray-950 via-black to-gray-900 text-white">
