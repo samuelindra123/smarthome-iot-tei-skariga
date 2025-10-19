@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.tecnoverse.smarhome",
+      "sha256_cert_fingerprints": [
+        "B2:A8:91:BB:C5:9D:6F:46:CE:DC:D0:A3:E6:4B:A3:83:17:DB:78:EB:8C:B4:FB:DB:B9:35:CC:63:25:DE:F1:F6"
+      ]
+    }
+  }
+]
